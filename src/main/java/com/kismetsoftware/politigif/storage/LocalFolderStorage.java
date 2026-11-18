@@ -76,11 +76,6 @@ public class LocalFolderStorage implements MediaStorage {
         return Files.size(resolve(key));
     }
 
-    @Override
-    public void delete(String key) throws IOException {
-        Files.deleteIfExists(resolve(key));
-    }
-
     Path resolve(String key) {
         Path path = root.resolve(key).normalize();
         if (!path.startsWith(root)) {

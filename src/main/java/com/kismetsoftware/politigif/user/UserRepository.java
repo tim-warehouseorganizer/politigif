@@ -8,7 +8,8 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
+/** Lookups filter by status: a RESET account is never found by email again. Nothing here deletes. */
 public interface UserRepository extends MongoRepository<User, String> {
 
-    Optional<User> findByEmail(String email);
+    Optional<User> findByEmailAndStatus(String email, int status);
 }

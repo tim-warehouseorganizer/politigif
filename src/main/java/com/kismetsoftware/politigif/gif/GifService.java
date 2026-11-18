@@ -134,46 +134,50 @@ public class GifService {
         return PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
-    // ---- hiding: GIFs are never deleted (except by the account reset, pending a decision) ----
+    // ---- status: GIFs are never deleted (no record, no MP4); see status.Status ----
 
     /**
      * The owner hides or unhides their own GIF. Needs only a signed-in session, not the seedling.
-     * Unhiding clears only the owner's flag: a GIF an admin hid stays hidden.
+     * Under an admin hide this records the owner's choice but the GIF stays hidden.
      *
      * @return the GIF, or empty if it doesn't exist or isn't theirs (the caller answers 404)
      */
     public Optional<Gif> setHiddenByOwner(String id, String ownerId, boolean hidden) {
-        Optional<Gif> gif = find(id).filter(g -> g.getOwnerId().equals(ownerId));
+        Optional<Gif> gif = find(id).filter(g -> ownerId != null && ownerId.equals(g.getOwnerId()));
         gif.ifPresent(g -> {
-            g.setHiddenByOwner(hidden);
+            g.ownerSetsHidden(hidden);
             gifs.save(g);
-            log.info("gif {} {} by its owner", g.getId(), hidden ? "hidden" : "unhidden");
+            log.info("gif {} {} by its owner (status {})", g.getId(), hidden ? "hidden" : "unhidden", g.getStatus());
         });
         return gif;
     }
 
-    /** An admin hides or unhides a GIF. The admin flag is one the owner cannot clear. */
+    /** An admin hides or unhides a GIF. The owner cannot undo an admin hide. */
     public Optional<Gif> setHiddenByAdmin(String id, boolean hidden) {
         Optional<Gif> gif = find(id);
         gif.ifPresent(g -> {
-            g.setHiddenByAdmin(hidden);
+            if (hidden) {
+                g.adminHide();
+            } else {
+                g.adminUnhide();
+            }
             gifs.save(g);
-            log.info("gif {} {} by an admin", g.getId(), hidden ? "hidden" : "unhidden");
+            log.info("gif {} {} by an admin (status {})", g.getId(), hidden ? "hidden" : "unhidden", g.getStatus());
         });
         return gif;
     }
 
     /**
-     * Every GIF the account owns, record and stored MP4: the account reset. The ONLY path that
-     * removes a GIF; it is kept as-is pending the owner's decision on what a reset does to GIFs.
+     * Account reset: every GIF the account owns is flagged RETIRED_BY_RESET and detached from it
+     * (the original owner id stays on the GIF). Records and stored MP4s are kept.
      */
-    public int deleteAllOwnedBy(String ownerId) throws IOException {
-        List<Gif> owned = gifs.findByOwnerId(ownerId);
+    public int retireAllOwnedBy(String ownerId) {
+        List<Gif> owned = gifs.findByOwnerIdOrderByCreatedAtDesc(ownerId);
         for (Gif gif : owned) {
-            storage.delete(gif.storageKey());
-            gifs.delete(gif);
-            log.info("deleted gif {} (account reset)", gif.getId());
+            gif.retireByReset();
         }
+        gifs.saveAll(owned);
+        log.info("retired {} gifs of account {} (account reset)", owned.size(), ownerId);
         return owned.size();
     }
 

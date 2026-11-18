@@ -43,17 +43,6 @@ class LocalFolderStorageTest {
     }
 
     @Test
-    void deleteIsIdempotent() throws IOException {
-        LocalFolderStorage storage = new LocalFolderStorage(dir);
-        storage.put("gifs/a.mp4", new byte[]{1}, "video/mp4");
-
-        storage.delete("gifs/a.mp4");
-        storage.delete("gifs/a.mp4");
-
-        assertThatThrownBy(() -> storage.open("gifs/a.mp4")).isInstanceOf(IOException.class);
-    }
-
-    @Test
     void keysCannotClimbOutOfTheFolder() throws IOException {
         LocalFolderStorage storage = new LocalFolderStorage(dir);
 

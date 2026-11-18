@@ -4,13 +4,17 @@
 
 package com.kismetsoftware.politigif.report;
 
+import com.kismetsoftware.politigif.status.ReportStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/** Someone flagged a GIF. Open until an admin dismisses it or hides the GIF. */
+/**
+ * Someone flagged a GIF. {@code status} ACTIVE = open; an admin dismissing it or hiding the GIF
+ * flips the status. Never deleted.
+ */
 @Document("reports")
 public class Report {
 
@@ -28,6 +32,13 @@ public class Report {
 
     private Instant createdAt;
 
+    /** {@link ReportStatus} code (the WHO pattern, see status.Status). */
+    @Indexed
+    private int status = ReportStatus.ACTIVE.code();
+
+    /** Who filed it, kept when an account reset detaches the report from the account. */
+    private String originalReporterId;
+
     public Report() {
     }
 
@@ -35,6 +46,7 @@ public class Report {
         this.gifId = gifId;
         this.reason = reason;
         this.reporterId = reporterId;
+        this.originalReporterId = reporterId;
         this.createdAt = createdAt;
     }
 
@@ -56,5 +68,13 @@ public class Report {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public int getStatus() {
+        return status;
+    }
+
+    public String getOriginalReporterId() {
+        return originalReporterId;
     }
 }

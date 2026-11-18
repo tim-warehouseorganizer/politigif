@@ -8,7 +8,11 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * Where the MP4s live. Production: DigitalOcean Spaces (S3-compatible). Dev: a local folder.
+ * Where the MP4s live. Write-once and never deleted (the no-delete rule, see status.Status): there
+ * is deliberately no delete method. Court-ordered removal is done by hand, see
+ * docs/court-ordered-deletion.md.
+ *
+ * Production: DigitalOcean Spaces (S3-compatible). Dev: a local folder.
  * Keys are opaque strings chosen by the caller ({@code gifs/<id>.mp4}).
  */
 public interface MediaStorage {
@@ -23,7 +27,4 @@ public interface MediaStorage {
 
     /** Object size in bytes. */
     long size(String key) throws IOException;
-
-    /** Removes the object; a missing object is not an error. */
-    void delete(String key) throws IOException;
 }

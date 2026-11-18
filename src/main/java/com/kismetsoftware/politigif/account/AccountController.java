@@ -81,7 +81,7 @@ public class AccountController {
                         HttpServletRequest request, HttpServletResponse response,
                         RedirectAttributes redirect) throws IOException {
         if (!understood) {
-            redirect.addFlashAttribute("error", "Tick the box to confirm: a reset deletes all your GIFs.");
+            redirect.addFlashAttribute("error", "Tick the box to confirm: a reset hides all your GIFs and starts a fresh, empty account.");
             return "redirect:/account";
         }
         String nonce = nonceCookie.ensure(request, response);

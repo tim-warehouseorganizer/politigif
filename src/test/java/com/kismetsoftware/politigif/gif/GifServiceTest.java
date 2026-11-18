@@ -126,14 +126,19 @@ class GifServiceTest {
     }
 
     @Test
-    void deleteAllOwnedByDeletesEachOfTheirs() throws IOException {
+    void aResetRetiresEachOfTheirGifsAndDeletesNothing() {
         Gif a = new Gif("aaaaaaaaaa", "t", List.of(), "u1", NOW, 2, 2, 10, false, 1);
         Gif b = new Gif("bbbbbbbbbb", "t", List.of(), "u1", NOW, 2, 2, 10, false, 1);
-        when(gifs.findByOwnerId("u1")).thenReturn(List.of(a, b));
+        when(gifs.findByOwnerIdOrderByCreatedAtDesc("u1")).thenReturn(List.of(a, b));
 
-        assertThat(service.deleteAllOwnedBy("u1")).isEqualTo(2);
-        verify(storage).delete("gifs/aaaaaaaaaa.mp4");
-        verify(storage).delete("gifs/bbbbbbbbbb.mp4");
+        assertThat(service.retireAllOwnedBy("u1")).isEqualTo(2);
+
+        assertThat(a.isRetiredByReset()).isTrue();
+        assertThat(a.getOwnerId()).isNull();
+        assertThat(a.getOriginalOwnerId()).isEqualTo("u1");
+        verify(gifs).saveAll(List.of(a, b));
+        verify(gifs, never()).delete(any());
+        org.mockito.Mockito.verifyNoInteractions(storage);
     }
 
     @Test

@@ -7,6 +7,8 @@ package com.kismetsoftware.politigif.signin;
 import com.kismetsoftware.politigif.ratelimit.RateLimitPolicy;
 import com.kismetsoftware.politigif.ratelimit.RateLimitedException;
 import com.kismetsoftware.politigif.ratelimit.RateLimiter;
+import com.kismetsoftware.politigif.status.SigninLinkStatus;
+import com.kismetsoftware.politigif.status.UserStatus;
 import com.kismetsoftware.politigif.user.User;
 import com.kismetsoftware.politigif.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -184,7 +186,7 @@ class SigninServiceTest {
         SigninLink link = link(nonce, NOW.plusSeconds(600), null);
         stored(link);
         consumes(link);
-        when(users.findByEmail("pat@example.com")).thenReturn(Optional.empty());
+        when(users.findByEmailAndStatus("pat@example.com", 1)).thenReturn(Optional.empty());
 
         SigninService.Redemption r = service.redeem(TOKEN, nonce, IP);
 
@@ -200,7 +202,7 @@ class SigninServiceTest {
         stored(link);
         consumes(link);
         User existing = new User("pat@example.com", NOW.minusSeconds(86400));
-        when(users.findByEmail("pat@example.com")).thenReturn(Optional.of(existing));
+        when(users.findByEmailAndStatus("pat@example.com", 1)).thenReturn(Optional.of(existing));
 
         SigninService.Redemption r = service.redeem(TOKEN, nonce, IP);
 
@@ -241,7 +243,7 @@ class SigninServiceTest {
         SigninService.Redemption r = service.redeem(TOKEN, nonce, IP);
 
         assertThat(r.state()).isEqualTo(SigninService.LinkState.EXPIRED);
-        verify(users, never()).findByEmail(anyString());
+        verify(users, never()).findByEmailAndStatus(anyString(), org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -249,7 +251,7 @@ class SigninServiceTest {
         SigninLink link = link(nonce, NOW.plusSeconds(600), null);
         stored(link);
         consumes(link);
-        when(users.findByEmail("pat@example.com")).thenReturn(Optional.empty());
+        when(users.findByEmailAndStatus("pat@example.com", 1)).thenReturn(Optional.empty());
 
         SigninService.Redemption r = service.redeem(TOKEN, nonce, "198.51.100.9");
 
@@ -262,7 +264,7 @@ class SigninServiceTest {
         stored(link);
         consumes(link);
         User winner = new User("pat@example.com", NOW);
-        when(users.findByEmail("pat@example.com")).thenReturn(Optional.empty(), Optional.of(winner));
+        when(users.findByEmailAndStatus("pat@example.com", 1)).thenReturn(Optional.empty(), Optional.of(winner));
         when(users.save(any(User.class))).thenThrow(new DuplicateKeyException("dup"));
 
         assertThat(service.redeem(TOKEN, nonce, IP).user()).isSameAs(winner);
@@ -307,5 +309,88 @@ class SigninServiceTest {
 
         verify(rateLimiter, never()).requireAll(any(), any());
         verify(mailer).deliver(eq("pat@example.com"), anyString(), eq(15L));
+    }
+
+    // ---- status flags (no-delete rule) ----
+
+    @Test
+    void redeemingFlipsTheLinkFromActiveToUsed() {
+        SigninLink link = link(nonce, NOW.plusSeconds(600), null);
+        stored(link);
+        consumes(link);
+        when(users.findByEmailAndStatus("pat@example.com", 1)).thenReturn(Optional.empty());
+
+        service.redeem(TOKEN, nonce, IP);
+
+        ArgumentCaptor<Query> q = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> u = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).findAndModify(q.capture(), u.capture(), any(FindAndModifyOptions.class), eq(SigninLink.class));
+        assertThat(q.getValue().getQueryObject()).containsEntry("status", SigninLinkStatus.ACTIVE.code());
+        assertThat(u.getValue().getUpdateObject().get("$set", org.bson.Document.class))
+                .containsEntry("status", SigninLinkStatus.USED.code());
+    }
+
+    @Test
+    void aLinkFlaggedExpiredIsExpiredEvenBeforeItsTime() {
+        SigninLink link = link(nonce, NOW.plusSeconds(600), null);
+        link.setStatus(SigninLinkStatus.EXPIRED.code());
+        stored(link);
+
+        assertThat(service.inspect(TOKEN, nonce)).isEqualTo(SigninService.LinkState.EXPIRED);
+    }
+
+    @Test
+    void aLinkRetiredByAResetCannotBeRedeemed() {
+        SigninLink link = link(nonce, NOW.plusSeconds(600), null);
+        link.setStatus(SigninLinkStatus.RETIRED_BY_RESET.code());
+        stored(link);
+
+        assertThat(service.redeem(TOKEN, nonce, IP).state()).isEqualTo(SigninService.LinkState.EXPIRED);
+        verify(mongo, never()).findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(SigninLink.class));
+    }
+
+    @Test
+    void resetRetiresOnlyThatAddressesActiveLinks() {
+        when(mongo.updateMulti(any(Query.class), any(Update.class), eq(SigninLink.class)))
+                .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(2, 2L, null));
+
+        assertThat(service.retireActiveLinksFor("pat@example.com")).isEqualTo(2);
+
+        ArgumentCaptor<Query> q = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> u = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateMulti(q.capture(), u.capture(), eq(SigninLink.class));
+        assertThat(q.getValue().getQueryObject()).containsEntry("email", "pat@example.com")
+                .containsEntry("status", SigninLinkStatus.ACTIVE.code());
+        assertThat(u.getValue().getUpdateObject().get("$set", org.bson.Document.class))
+                .containsEntry("status", SigninLinkStatus.RETIRED_BY_RESET.code());
+    }
+
+    @Test
+    void expiryFlagsOverdueActiveLinksInsteadOfDeletingThem() {
+        when(mongo.updateMulti(any(Query.class), any(Update.class), eq(SigninLink.class)))
+                .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(3, 3L, null));
+
+        assertThat(service.expireOverdueLinks()).isEqualTo(3);
+
+        ArgumentCaptor<Query> q = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> u = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateMulti(q.capture(), u.capture(), eq(SigninLink.class));
+        assertThat(q.getValue().getQueryObject()).containsEntry("status", SigninLinkStatus.ACTIVE.code());
+        assertThat(q.getValue().getQueryObject().get("expiresAt", org.bson.Document.class)).containsEntry("$lte", NOW);
+        assertThat(u.getValue().getUpdateObject().get("$set", org.bson.Document.class))
+                .containsEntry("status", SigninLinkStatus.EXPIRED.code());
+    }
+
+    @Test
+    void onlyAnActiveAccountIsSignedInto() {
+        SigninLink link = link(nonce, NOW.plusSeconds(600), null);
+        stored(link);
+        consumes(link);
+        when(users.findByEmailAndStatus("pat@example.com", UserStatus.ACTIVE.code())).thenReturn(Optional.empty());
+
+        SigninService.Redemption r = service.redeem(TOKEN, nonce, IP);
+
+        assertThat(r.newAccount()).isTrue();
+        assertThat(r.user().isActive()).isTrue();
     }
 }

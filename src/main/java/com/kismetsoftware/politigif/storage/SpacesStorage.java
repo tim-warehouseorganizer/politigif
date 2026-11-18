@@ -9,13 +9,11 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 
@@ -65,10 +63,5 @@ public class SpacesStorage implements MediaStorage {
     @Override
     public long size(String key) {
         return s3.headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build()).contentLength();
-    }
-
-    @Override
-    public void delete(String key) throws IOException {
-        s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 }

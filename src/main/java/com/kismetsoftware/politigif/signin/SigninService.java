@@ -6,6 +6,8 @@ package com.kismetsoftware.politigif.signin;
 
 import com.kismetsoftware.politigif.ratelimit.RateLimitPolicy;
 import com.kismetsoftware.politigif.ratelimit.RateLimiter;
+import com.kismetsoftware.politigif.status.SigninLinkStatus;
+import com.kismetsoftware.politigif.status.UserStatus;
 import com.kismetsoftware.politigif.user.Emails;
 import com.kismetsoftware.politigif.user.User;
 import com.kismetsoftware.politigif.user.UserRepository;
@@ -139,11 +141,12 @@ public class SigninService {
         if (!nonceMatches(link, browserNonce)) {
             return new Redemption(LinkState.OTHER_BROWSER, null, false);
         }
-        // Single use, atomically: two racing POSTs cannot both match usedAt == null.
+        // Single use, atomically: two racing POSTs cannot both find it ACTIVE.
         SigninLink consumed = mongo.findAndModify(
-                Query.query(Criteria.where("_id").is(link.getId()).and("usedAt").isNull()
+                Query.query(Criteria.where("_id").is(link.getId())
+                        .and("status").is(SigninLinkStatus.ACTIVE.code())
                         .and("expiresAt").gt(now)),
-                new Update().set("usedAt", now),
+                new Update().set("status", SigninLinkStatus.USED.code()).set("usedAt", now),
                 FindAndModifyOptions.options().returnNew(true),
                 SigninLink.class);
         if (consumed == null) {
@@ -152,7 +155,7 @@ public class SigninService {
         if (link.getRequestIp() != null && !link.getRequestIp().equals(ip)) {
             log.warn("sign-in link {} redeemed from a different IP than the one that requested it", link.getId());
         }
-        Optional<User> existing = users.findByEmail(link.getEmail());
+        Optional<User> existing = users.findByEmailAndStatus(link.getEmail(), UserStatus.ACTIVE.code());
         if (existing.isPresent()) {
             return new Redemption(LinkState.READY, existing.get(), false);
         }
@@ -164,8 +167,28 @@ public class SigninService {
             return users.save(new User(email, now));
         } catch (DuplicateKeyException race) {
             // Two links for one address redeemed at once: the other request created it first.
-            return users.findByEmail(email).orElseThrow(() -> race);
+            return users.findByEmailAndStatus(email, UserStatus.ACTIVE.code()).orElseThrow(() -> race);
         }
+    }
+
+    /**
+     * Account reset: every still-ACTIVE link for the address is flagged RETIRED_BY_RESET (never
+     * deleted), so a link mailed before the reset can no longer sign anyone in.
+     */
+    public long retireActiveLinksFor(String email) {
+        return mongo.updateMulti(
+                Query.query(Criteria.where("email").is(email).and("status").is(SigninLinkStatus.ACTIVE.code())),
+                new Update().set("status", SigninLinkStatus.RETIRED_BY_RESET.code()),
+                SigninLink.class).getModifiedCount();
+    }
+
+    /** Flags ACTIVE links past their expiry as EXPIRED. Replaces the TTL index that used to delete them. */
+    public long expireOverdueLinks() {
+        return mongo.updateMulti(
+                Query.query(Criteria.where("status").is(SigninLinkStatus.ACTIVE.code())
+                        .and("expiresAt").lte(clock.instant())),
+                new Update().set("status", SigninLinkStatus.EXPIRED.code()),
+                SigninLink.class).getModifiedCount();
     }
 
     private Optional<SigninLink> find(String token) {

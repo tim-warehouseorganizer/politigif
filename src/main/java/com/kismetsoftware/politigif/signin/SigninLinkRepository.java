@@ -8,9 +8,8 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
+/** Nothing here deletes: links change status (see status.SigninLinkStatus). */
 public interface SigninLinkRepository extends MongoRepository<SigninLink, String> {
 
     Optional<SigninLink> findByTokenHash(String tokenHash);
-
-    void deleteByEmail(String email);
 }

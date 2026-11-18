@@ -21,7 +21,8 @@ import java.io.IOException;
 /**
  * Re-checks the account behind an existing session on every request (fieldbook donor shape):
  * <ul>
- *   <li>account gone (reset or deleted) → the session ends, back to {@code /signin?ended};</li>
+ *   <li>account no longer ACTIVE (an account reset flags it RESET; records are never deleted) →
+ *       the session ends, back to {@code /signin?ended};</li>
  *   <li>no seedling yet → held at {@code /seedling} until one is chosen.</li>
  * </ul>
  * Spring Security never consults the store again once a session exists, so without this an
@@ -58,8 +59,8 @@ public class AccountStatusFilter extends OncePerRequestFilter {
             return;
         }
         User current = userRepository.findById(principal.userId()).orElse(null);
-        if (current == null) {
-            log.info("ending session for an account that no longer exists ({})", principal.userId());
+        if (current == null || !current.isActive()) {
+            log.info("ending session for an account that was reset ({})", principal.userId());
             sessionSignIn.signOut(request);
             response.sendRedirect("/signin?ended");
             return;

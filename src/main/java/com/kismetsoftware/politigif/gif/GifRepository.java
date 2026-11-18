@@ -13,13 +13,14 @@ import org.springframework.data.mongodb.repository.Query;
 import java.util.List;
 
 /**
- * Every public listing goes through a query that excludes hidden GIFs ({@code $ne: true}, so
- * documents written before the hide flags existed count as public). There is deliberately no
- * public finder that returns hidden GIFs.
+ * Every public listing filters on {@code status: 1} (ACTIVE, the WHO convention; see
+ * {@link com.kismetsoftware.politigif.status.Status}). There is no public finder that returns a
+ * hidden or retired GIF, and nothing here deletes.
  */
 public interface GifRepository extends MongoRepository<Gif, String> {
 
-    String PUBLIC = "'hiddenByOwner': { $ne: true }, 'hiddenByAdmin': { $ne: true }";
+    /** The status filter every public query carries: {@code GifStatus.ACTIVE}. */
+    String PUBLIC = "'status': 1";
 
     /** The feed. The caller's Pageable carries the newest-first sort. */
     @Query("{ " + PUBLIC + " }")
@@ -35,8 +36,6 @@ public interface GifRepository extends MongoRepository<Gif, String> {
     @Query("{ 'title': { $regex: ?0, $options: 'i' }, " + PUBLIC + " }")
     Page<Gif> findPublicByTitleMatching(String quotedPattern, Pageable pageable);
 
-    /** The owner's own list, hidden ones included. */
+    /** The owner's own list, hidden ones included. Retired GIFs have no owner and never appear. */
     List<Gif> findByOwnerIdOrderByCreatedAtDesc(String ownerId);
-
-    List<Gif> findByOwnerId(String ownerId);
 }

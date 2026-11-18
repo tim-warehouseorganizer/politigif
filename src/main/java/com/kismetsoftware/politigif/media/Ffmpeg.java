@@ -137,7 +137,7 @@ public class Ffmpeg {
                 synchronized (into) {
                     into.append(new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8));
                     if (into.length() > 8192) {
-                        into.delete(0, into.length() - 4096);
+                        into.replace(0, into.length() - 4096, "");
                     }
                 }
             }

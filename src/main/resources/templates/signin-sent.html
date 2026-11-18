@@ -10,7 +10,7 @@
 <header th:replace="~{fragments/common :: navbar}"></header>
 <main class="wrap narrow">
     <h1>Check your email</h1>
-    <p th:if="${param.reset}">Your account was reset: your GIFs are gone. We sent a fresh sign-in link to the same address.
+    <p th:if="${param.reset}">Your account was reset: your GIFs are off the site. We sent a fresh sign-in link to the same address.
         Open it in this browser and choose a new seedling.</p>
     <p th:unless="${param.reset}">If that address can get mail, a sign-in link is on its way.</p>
     <p>Open the link <strong>in this browser</strong>. It works once, for 15 minutes.</p>

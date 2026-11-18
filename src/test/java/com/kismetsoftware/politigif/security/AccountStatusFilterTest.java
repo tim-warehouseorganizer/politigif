@@ -97,6 +97,20 @@ class AccountStatusFilterTest {
     }
 
     @Test
+    void anAccountFlaggedResetEndsTheSession() throws Exception {
+        signedIn();
+        user.retire(Instant.EPOCH);
+        when(users.findById("u1")).thenReturn(Optional.of(user));
+        MockFilterChain chain = new MockFilterChain();
+
+        MockHttpServletResponse response = run("/upload", chain);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("/signin?ended");
+        assertThat(chain.getRequest()).isNull();
+        verify(sessionSignIn).signOut(any());
+    }
+
+    @Test
     void anAccountWithoutASeedlingIsHeldAtTheSeedlingPage() throws Exception {
         signedIn();
         user.setSeedlingHash(null);

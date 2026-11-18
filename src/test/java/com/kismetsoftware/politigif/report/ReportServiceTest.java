@@ -8,11 +8,16 @@ import com.kismetsoftware.politigif.gif.Gif;
 import com.kismetsoftware.politigif.gif.GifService;
 import com.kismetsoftware.politigif.ratelimit.RateLimitPolicy;
 import com.kismetsoftware.politigif.ratelimit.RateLimiter;
+import com.kismetsoftware.politigif.status.ReportStatus;
+import com.mongodb.client.result.UpdateResult;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
-import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -21,6 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,6 +38,7 @@ class ReportServiceTest {
     private static final Gif GIF = new Gif("abcdEFGH23", "t", List.of(), "owner", NOW, 2, 2, 10, false, 1);
 
     private ReportRepository reports;
+    private MongoTemplate mongo;
     private GifService gifService;
     private RateLimiter rateLimiter;
     private ReportService service;
@@ -39,13 +46,28 @@ class ReportServiceTest {
     @BeforeEach
     void setUp() {
         reports = mock(ReportRepository.class);
+        mongo = mock(MongoTemplate.class);
         gifService = mock(GifService.class);
         rateLimiter = mock(RateLimiter.class);
-        service = new ReportService(reports, gifService, rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new ReportService(reports, mongo, gifService, rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC));
+        when(mongo.updateMulti(any(Query.class), any(Update.class), eq(Report.class)))
+                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+    }
+
+    private Document captureUpdate() {
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateMulti(any(Query.class), update.capture(), eq(Report.class));
+        return update.getValue().getUpdateObject();
+    }
+
+    private Document captureQuery() {
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongo).updateMulti(query.capture(), any(Update.class), eq(Report.class));
+        return query.getValue().getQueryObject();
     }
 
     @Test
-    void aReportOnAnExistingGifIsSaved() {
+    void aReportOnAnExistingGifIsSavedOpen() {
         when(gifService.find("abcdEFGH23")).thenReturn(Optional.of(GIF));
 
         assertThat(service.report("abcdEFGH23", Reason.HATE, null, "1.2.3.4")).isTrue();
@@ -53,12 +75,12 @@ class ReportServiceTest {
         ArgumentCaptor<Report> saved = ArgumentCaptor.forClass(Report.class);
         verify(reports).save(saved.capture());
         assertThat(saved.getValue().getReason()).isEqualTo(Reason.HATE);
-        assertThat(saved.getValue().getReporterId()).isNull();
+        assertThat(saved.getValue().getStatus()).isEqualTo(ReportStatus.ACTIVE.code());
         verify(rateLimiter).require(RateLimitPolicy.REPORT_PER_IP, "1.2.3.4");
     }
 
     @Test
-    void aMissingReasonIsFiledAsOther() {
+    void aMissingReasonIsFiledAsOtherAndTheReporterIsRecordedTwice() {
         when(gifService.find("abcdEFGH23")).thenReturn(Optional.of(GIF));
 
         service.report("abcdEFGH23", null, "u9", "1.2.3.4");
@@ -67,6 +89,7 @@ class ReportServiceTest {
         verify(reports).save(saved.capture());
         assertThat(saved.getValue().getReason()).isEqualTo(Reason.OTHER);
         assertThat(saved.getValue().getReporterId()).isEqualTo("u9");
+        assertThat(saved.getValue().getOriginalReporterId()).isEqualTo("u9");
     }
 
     @Test
@@ -78,44 +101,48 @@ class ReportServiceTest {
     }
 
     @Test
-    void theQueueGroupsReportsByGif() {
+    void theQueueShowsOpenReportsOnlyGroupedByGif() {
         Report a1 = new Report("abcdEFGH23", Reason.HATE, null, NOW);
-        Report b1 = new Report("gone000000", Reason.SPAM, null, NOW.minusSeconds(10));
         Report a2 = new Report("abcdEFGH23", Reason.SPAM, null, NOW.minusSeconds(20));
-        when(reports.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(a1, b1, a2));
+        when(reports.findByStatusOrderByCreatedAtDesc(ReportStatus.ACTIVE.code())).thenReturn(List.of(a1, a2));
         when(gifService.find("abcdEFGH23")).thenReturn(Optional.of(GIF));
-        when(gifService.find("gone000000")).thenReturn(Optional.empty());
 
         List<ReportService.QueueItem> queue = service.queue();
 
-        assertThat(queue).hasSize(2);
-        assertThat(queue.get(0).gif()).isSameAs(GIF);
-        assertThat(queue.get(0).reports()).containsExactly(a1, a2);
-        assertThat(queue.get(1).gif()).isNull();
+        assertThat(queue).hasSize(1);
+        assertThat(queue.getFirst().reports()).containsExactly(a1, a2);
     }
 
     @Test
-    void anAdminHideHidesTheGifAndClosesItsReports() throws IOException {
+    void dismissingFlagsTheOpenReportsDismissedAndKeepsTheGif() {
+        service.dismiss("abcdEFGH23");
+
+        assertThat(captureUpdate().get("$set", Document.class).get("status")).isEqualTo(ReportStatus.DISMISSED.code());
+        assertThat(captureQuery()).containsEntry("gifId", "abcdEFGH23").containsEntry("status", ReportStatus.ACTIVE.code());
+        verify(gifService, never()).setHiddenByAdmin(any(), eq(true));
+    }
+
+    @Test
+    void anAdminHideHidesTheGifAndFlagsItsReportsClosed() {
         service.hideGif("abcdEFGH23");
 
         verify(gifService).setHiddenByAdmin("abcdEFGH23", true);
-        verify(reports).deleteByGifId("abcdEFGH23");
-        verify(gifService, never()).deleteAllOwnedBy(any());
+        assertThat(captureUpdate().get("$set", Document.class).get("status")).isEqualTo(ReportStatus.CLOSED_BY_HIDE.code());
     }
 
     @Test
-    void anAdminUnhideClearsOnlyTheAdminFlagAndLeavesReportsAlone() {
+    void anAdminUnhideLeavesReportsAlone() {
         service.unhideGif("abcdEFGH23");
 
         verify(gifService).setHiddenByAdmin("abcdEFGH23", false);
-        verify(reports, never()).deleteByGifId(any());
+        verify(mongo, never()).updateMulti(any(Query.class), any(Update.class), eq(Report.class));
     }
 
     @Test
-    void dismissingKeepsTheGif() {
-        service.dismiss("abcdEFGH23");
+    void anAccountResetDetachesTheReporterButKeepsTheReports() {
+        assertThat(service.detachReporter("u9")).isEqualTo(1);
 
-        verify(reports).deleteByGifId("abcdEFGH23");
-        verify(gifService, never()).find(any());
+        assertThat(captureQuery()).containsEntry("reporterId", "u9");
+        assertThat(captureUpdate().get("$set", Document.class)).containsEntry("reporterId", null);
     }
 }

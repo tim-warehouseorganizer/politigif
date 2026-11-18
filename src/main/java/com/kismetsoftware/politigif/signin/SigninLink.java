@@ -4,6 +4,7 @@
 
 package com.kismetsoftware.politigif.signin;
 
+import com.kismetsoftware.politigif.status.SigninLinkStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -12,8 +13,8 @@ import java.time.Instant;
 
 /**
  * One emailed sign-in link. Holds hashes only: the token (from the URL) and the nonce (from the
- * cookie set on the browser that asked). Single use: {@code usedAt} is set atomically on redeem.
- * Mongo deletes the row a day after it expires.
+ * cookie set on the browser that asked). Single use: {@code status} goes ACTIVE → USED atomically
+ * on redeem. Never deleted (no TTL index): {@code SigninLinkExpirer} flips expired ones to EXPIRED.
  */
 @Document("signin_links")
 public class SigninLink {
@@ -31,10 +32,14 @@ public class SigninLink {
     private String requestIp;
     private Instant createdAt;
 
-    @Indexed(expireAfter = "1d")
+    @Indexed
     private Instant expiresAt;
 
     private Instant usedAt;
+
+    /** {@link SigninLinkStatus} code (the WHO pattern, see status.Status). */
+    @Indexed
+    private int status = SigninLinkStatus.ACTIVE.code();
 
     public SigninLink() {
     }
@@ -50,7 +55,15 @@ public class SigninLink {
     }
 
     public boolean usableAt(Instant now) {
-        return usedAt == null && now.isBefore(expiresAt);
+        return status == SigninLinkStatus.ACTIVE.code() && usedAt == null && now.isBefore(expiresAt);
+    }
+
+    public int getStatus() {
+        return status;
+    }
+
+    public void setStatus(int status) {
+        this.status = status;
     }
 
     public String getId() {

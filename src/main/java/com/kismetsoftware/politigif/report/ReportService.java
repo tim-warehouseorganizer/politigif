@@ -8,6 +8,11 @@ import com.kismetsoftware.politigif.gif.Gif;
 import com.kismetsoftware.politigif.gif.GifService;
 import com.kismetsoftware.politigif.ratelimit.RateLimitPolicy;
 import com.kismetsoftware.politigif.ratelimit.RateLimiter;
+import com.kismetsoftware.politigif.status.ReportStatus;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -16,21 +21,27 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Reports in, the admin queue out, and the two ways a report is closed. */
+/**
+ * Reports in, the admin queue out, and the ways a report is closed. Closing a report flips its
+ * {@code status}; reports are never deleted (see status.Status).
+ */
 @Service
 public class ReportService {
 
-    /** One reported GIF in the admin queue: the GIF (null if already gone) and its open reports. */
+    /** One reported GIF in the admin queue: the GIF (null if the id no longer resolves) and its open reports. */
     public record QueueItem(String gifId, Gif gif, List<Report> reports) {
     }
 
     private final ReportRepository reports;
+    private final MongoTemplate mongo;
     private final GifService gifService;
     private final RateLimiter rateLimiter;
     private final Clock clock;
 
-    public ReportService(ReportRepository reports, GifService gifService, RateLimiter rateLimiter, Clock clock) {
+    public ReportService(ReportRepository reports, MongoTemplate mongo, GifService gifService,
+                         RateLimiter rateLimiter, Clock clock) {
         this.reports = reports;
+        this.mongo = mongo;
         this.gifService = gifService;
         this.rateLimiter = rateLimiter;
         this.clock = clock;
@@ -50,10 +61,10 @@ public class ReportService {
         return true;
     }
 
-    /** Open reports grouped by GIF, most recently reported first. */
+    /** Open (ACTIVE) reports grouped by GIF, most recently reported first. */
     public List<QueueItem> queue() {
         Map<String, List<Report>> byGif = new LinkedHashMap<>();
-        for (Report report : reports.findAllByOrderByCreatedAtDesc()) {
+        for (Report report : reports.findByStatusOrderByCreatedAtDesc(ReportStatus.ACTIVE.code())) {
             byGif.computeIfAbsent(report.getGifId(), k -> new ArrayList<>()).add(report);
         }
         List<QueueItem> items = new ArrayList<>();
@@ -61,22 +72,37 @@ public class ReportService {
         return items;
     }
 
-    /** The GIF stays; its reports close. */
+    /** The GIF stays; its open reports are flagged DISMISSED. */
     public void dismiss(String gifId) {
-        reports.deleteByGifId(gifId);
+        close(gifId, ReportStatus.DISMISSED);
+    }
+
+    /** An admin hides the GIF (a hide its owner cannot undo); its open reports are flagged CLOSED_BY_HIDE. */
+    public void hideGif(String gifId) {
+        gifService.setHiddenByAdmin(gifId, true);
+        close(gifId, ReportStatus.CLOSED_BY_HIDE);
+    }
+
+    /** An admin reverses their own hide; the owner's choice underneath is restored. */
+    public void unhideGif(String gifId) {
+        gifService.setHiddenByAdmin(gifId, false);
     }
 
     /**
-     * An admin hides the GIF (a flag its owner cannot undo) and its reports close. GIFs are never
-     * deleted: the record and the stored MP4 stay.
+     * Account reset: reports the account filed stay (and stay open), detached from the account; the
+     * original reporter id is kept on each report.
      */
-    public void hideGif(String gifId) {
-        gifService.setHiddenByAdmin(gifId, true);
-        reports.deleteByGifId(gifId);
+    public long detachReporter(String reporterId) {
+        return mongo.updateMulti(
+                Query.query(Criteria.where("reporterId").is(reporterId)),
+                new Update().set("reporterId", null),
+                Report.class).getModifiedCount();
     }
 
-    /** An admin reverses their own hide. The owner's flag, if set, is left alone. */
-    public void unhideGif(String gifId) {
-        gifService.setHiddenByAdmin(gifId, false);
+    private void close(String gifId, ReportStatus to) {
+        mongo.updateMulti(
+                Query.query(Criteria.where("gifId").is(gifId).and("status").is(ReportStatus.ACTIVE.code())),
+                new Update().set("status", to.code()),
+                Report.class);
     }
 }

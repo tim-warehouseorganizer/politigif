@@ -47,12 +47,12 @@
 
     <section class="danger-zone">
         <h2>Forgot your seedling? Reset your account</h2>
-        <p>A reset <strong>deletes every GIF you've uploaded</strong> and everything else on your account.
-            We then email a fresh sign-in link to the same address, and you choose a new seedling on the empty account.
-            It can't be undone.</p>
+        <p>A reset <strong>takes every GIF you've uploaded off the site</strong> (hidden and detached from your account)
+            and closes this account. We then email a fresh sign-in link to the same address, and you start again on a new,
+            empty account with a new seedling. You can't get the old account or its GIFs back yourself.</p>
         <form th:action="@{/account/reset}" method="post" class="stack">
             <label class="check"><input type="checkbox" name="understood" value="true" required>
-                I understand this deletes all my GIFs.</label>
+                I understand all my GIFs come off the site and I start an empty account.</label>
             <button type="submit" class="button danger">Reset my account</button>
         </form>
     </section>
