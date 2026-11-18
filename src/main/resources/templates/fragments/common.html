@@ -1,0 +1,52 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <!-- Shared head. Pages that are private or tokenized pass noindex=true. -->
+    <th:block th:fragment="site-head(title, noindex)">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta th:if="${noindex}" name="robots" content="noindex, nofollow">
+        <meta name="theme-color" content="#14213d">
+        <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+        <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
+        <title th:text="${title} + ' · politigif'">politigif</title>
+        <link rel="icon" th:href="@{/favicon.svg(v=${staticVersion})}" type="image/svg+xml">
+        <link rel="stylesheet" th:href="@{/css/site.css(v=${staticVersion})}">
+        <script th:src="@{/js/app.js(v=${staticVersion})}" defer></script>
+    </th:block>
+</head>
+<body>
+
+<header class="bar" th:fragment="navbar">
+    <div class="bar-inner">
+        <a class="brand" href="/"><img class="mark" th:src="@{/favicon.svg(v=${staticVersion})}" alt=""> politigif</a>
+        <form class="search" action="/" method="get" role="search">
+            <input type="search" name="q" th:value="${q}" placeholder="Search titles or #tags" aria-label="Search">
+        </form>
+        <nav aria-label="Main">
+            <a sec:authorize="isAuthenticated()" class="button" href="/upload">Upload</a>
+            <a sec:authorize="hasRole('ADMIN')" href="/admin/reports">Reports</a>
+            <a sec:authorize="isAuthenticated()" href="/account">Account</a>
+            <form sec:authorize="isAuthenticated()" th:action="@{/signout}" method="post">
+                <button type="submit" class="link">Sign out</button>
+            </form>
+            <a sec:authorize="!isAuthenticated()" class="button" href="/signin">Sign in</a>
+        </nav>
+    </div>
+</header>
+
+<th:block th:fragment="flash">
+    <p class="notice" th:if="${notice}" th:text="${notice}" role="status">Saved.</p>
+    <p class="notice bad" th:if="${error}" th:text="${error}" role="alert">Something went wrong.</p>
+</th:block>
+
+<footer class="site" th:fragment="footer">
+    politigif is a DBA of Kismet Software LLC. © 2026 Kismet Software LLC. All rights reserved.
+    Every GIF is public. GIFs are trimmed to 7.77 seconds.
+</footer>
+
+</body>
+</html>

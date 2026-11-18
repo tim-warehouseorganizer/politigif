@@ -1,0 +1,21 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Check your email', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <h1>Check your email</h1>
+    <p th:if="${param.reset}">Your account was reset: your GIFs are gone. We sent a fresh sign-in link to the same address.
+        Open it in this browser and choose a new seedling.</p>
+    <p th:unless="${param.reset}">If that address can get mail, a sign-in link is on its way.</p>
+    <p>Open the link <strong>in this browser</strong>. It works once, for 15 minutes.</p>
+    <p class="hint">Nothing arrived? Check spam, or <a href="/signin">ask for another link</a>.</p>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Choose your seedling', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <h1>Choose your seedling</h1>
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+    <p>Your seedling is your account's secret. You never need it to sign in (your email link does that).
+        You need it to change anything about your account.</p>
+    <p class="notice warn"><strong>A forgotten seedling can't be recovered.</strong> Nobody can look it up or reset it for you.
+        If you lose it, the only way back is an account reset, which deletes all your GIFs.</p>
+    <form th:action="@{/seedling}" method="post" class="stack">
+        <label for="seedling">Seedling (8 characters or more)</label>
+        <input type="password" id="seedling" name="seedling" required minlength="8" autocomplete="new-password">
+        <label for="confirmation">Type it again</label>
+        <input type="password" id="confirmation" name="confirmation" required minlength="8" autocomplete="new-password">
+        <button type="submit" class="button">Plant it</button>
+    </form>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

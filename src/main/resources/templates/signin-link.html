@@ -1,0 +1,41 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Sign in', true)}"></th:block>
+    <!-- Never send the tokenized URL anywhere as a referrer. -->
+    <meta name="referrer" content="no-referrer">
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+
+    <th:block th:if="${state == 'READY'}">
+        <h1>Sign in to politigif</h1>
+        <p>One tap and you're in.</p>
+        <form th:action="@{/signin/{t}(t=${token})}" method="post">
+            <button type="submit" class="button big">Sign me in</button>
+        </form>
+    </th:block>
+
+    <th:block th:if="${state == 'OTHER_BROWSER'}">
+        <h1>Different browser</h1>
+        <p>This link was opened in a different browser from the one that asked for it, so it won't work here.
+            Open it in that browser, or get a new link for this one.</p>
+        <form th:action="@{/signin/{t}/resend(t=${token})}" method="post">
+            <button type="submit" class="button">Send a new link for this browser</button>
+        </form>
+    </th:block>
+
+    <th:block th:if="${state == 'EXPIRED'}">
+        <h1>That link has expired</h1>
+        <p>Sign-in links work once, for 15 minutes. Ask for a new one.</p>
+        <p><a class="button" href="/signin">Get a new link</a></p>
+    </th:block>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

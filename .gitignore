@@ -1,0 +1,6 @@
+target/
+data/
+*.minn.js
+.idea/
+*.iml
+.env

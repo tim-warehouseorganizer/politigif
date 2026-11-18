@@ -1,0 +1,38 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Reports', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap">
+    <h1>Reported GIFs</h1>
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+    <p th:if="${queue.isEmpty()}" class="empty">Nothing reported. Quiet day.</p>
+    <ul class="queue">
+        <li th:each="item : ${queue}" class="queue-item">
+            <a th:if="${item.gif() != null}" th:href="@{/g/{id}(id=${item.gifId()})}">
+                <video th:src="@{/g/{id}.mp4(id=${item.gifId()})}" autoplay muted loop playsinline preload="metadata"></video>
+            </a>
+            <div>
+                <h2 th:text="${item.gif() != null} ? ${item.gif().title} : '(already deleted)'">Title</h2>
+                <p><span th:text="${item.reports().size()}">2</span> report(s):
+                    <span th:each="r, s : ${item.reports()}"><span th:text="${r.reason.label()}">Spam</span><span th:unless="${s.last}">, </span></span></p>
+                <div class="actions">
+                    <form th:action="@{/admin/gifs/{id}/delete(id=${item.gifId()})}" method="post">
+                        <button type="submit" class="button danger">Delete GIF</button>
+                    </form>
+                    <form th:action="@{/admin/reports/{id}/dismiss(id=${item.gifId()})}" method="post">
+                        <button type="submit" class="button">Dismiss reports</button>
+                    </form>
+                </div>
+            </div>
+        </li>
+    </ul>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

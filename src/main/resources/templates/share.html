@@ -1,0 +1,67 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head(${gif.title}, false)}"></th:block>
+    <meta name="description" th:content="${gif.title} + ' — a political GIF on politigif'">
+    <link rel="canonical" th:href="${canonical}">
+    <meta property="og:site_name" content="politigif">
+    <meta property="og:type" content="video.other">
+    <meta property="og:title" th:content="${gif.title}">
+    <meta property="og:url" th:content="${canonical}">
+    <meta property="og:image" th:content="${canonical} + '/poster.jpg'">
+    <meta property="og:image:width" th:content="${gif.width}">
+    <meta property="og:image:height" th:content="${gif.height}">
+    <meta property="og:video" th:content="${canonical} + '.mp4'">
+    <meta property="og:video:secure_url" th:content="${canonical} + '.mp4'">
+    <meta property="og:video:type" content="video/mp4">
+    <meta property="og:video:width" th:content="${gif.width}">
+    <meta property="og:video:height" th:content="${gif.height}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" th:content="${gif.title}">
+    <meta name="twitter:image" th:content="${canonical} + '/poster.jpg'">
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+    <p class="notice" th:if="${isOwner and gif.trimmed}" role="status">Your GIF was trimmed to 7.77 s</p>
+
+    <h1 th:text="${gif.title}">Title</h1>
+    <figure class="player">
+        <video th:src="@{/g/{id}.mp4(id=${gif.id})}" th:poster="@{/g/{id}/poster.jpg(id=${gif.id})}"
+               autoplay muted loop playsinline th:width="${gif.width}" th:height="${gif.height}"></video>
+    </figure>
+    <div class="tags">
+        <a class="tag" th:each="t : ${gif.tags}" th:href="@{/(q='#' + ${t})}" th:text="'#' + ${t}">#tag</a>
+    </div>
+
+    <div class="actions">
+        <button type="button" class="button" th:attr="data-copy=${canonical}">Copy link</button>
+        <button type="button" class="button" th:attr="data-share=${canonical},data-title=${gif.title}" hidden>Share</button>
+        <a class="button" th:href="@{/g/{id}.gif(id=${gif.id})}" th:attr="download='politigif-' + ${gif.id} + '.gif'">Download GIF</a>
+        <a class="button" th:href="@{/g/{id}.mp4(id=${gif.id})}" th:attr="download='politigif-' + ${gif.id} + '.mp4'">Save video</a>
+    </div>
+    <p class="hint" data-copied hidden role="status">Link copied.</p>
+
+    <details class="report">
+        <summary>Report this GIF</summary>
+        <form th:action="@{/g/{id}/report(id=${gif.id})}" method="post">
+            <label for="reason">What's wrong with it?</label>
+            <select id="reason" name="reason">
+                <option th:each="r : ${reasons}"
+                        th:value="${r}" th:text="${r.label()}">Spam</option>
+            </select>
+            <button type="submit" class="button">Send report</button>
+        </form>
+    </details>
+
+    <form sec:authorize="hasRole('ADMIN')" class="admin-delete" th:action="@{/admin/gifs/{id}/delete(id=${gif.id})}" method="post">
+        <button type="submit" class="button danger">Delete this GIF (admin)</button>
+    </form>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

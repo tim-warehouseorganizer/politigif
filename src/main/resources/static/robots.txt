@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /signin
+Disallow: /seedling
+Disallow: /account
+Disallow: /upload
+Disallow: /admin
+
+Sitemap: https://www.politigif.com/sitemap.xml

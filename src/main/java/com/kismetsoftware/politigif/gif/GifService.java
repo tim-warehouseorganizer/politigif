@@ -1,0 +1,141 @@
+/*
+ * Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+ */
+
+package com.kismetsoftware.politigif.gif;
+
+import com.kismetsoftware.politigif.media.MediaService;
+import com.kismetsoftware.politigif.media.UploadRejectedException;
+import com.kismetsoftware.politigif.ratelimit.RateLimitPolicy;
+import com.kismetsoftware.politigif.ratelimit.RateLimiter;
+import com.kismetsoftware.politigif.storage.MediaStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/** Creating, finding, listing and deleting GIFs. */
+@Service
+public class GifService {
+
+    private static final Logger log = LoggerFactory.getLogger(GifService.class);
+
+    public static final int MAX_TITLE = 120;
+    public static final int PAGE_SIZE = 24;
+    private static final String ID_ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    static final int ID_LENGTH = 10;
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    private final GifRepository gifs;
+    private final MediaService media;
+    private final MediaStorage storage;
+    private final RateLimiter rateLimiter;
+    private final Clock clock;
+
+    public GifService(GifRepository gifs, MediaService media, MediaStorage storage,
+                      RateLimiter rateLimiter, Clock clock) {
+        this.gifs = gifs;
+        this.media = media;
+        this.storage = storage;
+        this.rateLimiter = rateLimiter;
+        this.clock = clock;
+    }
+
+    /**
+     * Converts and stores one upload. Title and tags are checked before a byte of the body is
+     * read, so a bad form costs no ffmpeg run.
+     *
+     * @throws UploadRejectedException with a message for the uploader
+     */
+    public Gif upload(String ownerId, String rawTitle, String rawTags, InputStream body) throws IOException {
+        String title = cleanTitle(rawTitle);
+        List<String> tags = Tags.parse(rawTags);
+        rateLimiter.require(RateLimitPolicy.UPLOAD_PER_USER, ownerId);
+
+        MediaService.Converted converted = media.convertUpload(body);
+        String id = newId();
+        storage.put(Gif.storageKeyFor(id), converted.mp4(), "video/mp4");
+        var g = converted.gif();
+        Gif gif = new Gif(id, title, tags, ownerId, clock.instant(), g.width(), g.height(),
+                g.durationCs(), g.trimmed(), converted.mp4().length);
+        gifs.save(gif);
+        log.info("stored gif {} ({} frames, {} cs, trimmed={}, {} bytes mp4)",
+                id, g.frames(), g.durationCs(), g.trimmed(), converted.mp4().length);
+        return gif;
+    }
+
+    static String cleanTitle(String raw) {
+        String title = raw == null ? "" : raw.strip().replaceAll("\\s+", " ");
+        if (title.isEmpty()) {
+            throw new UploadRejectedException("Give your GIF a title.");
+        }
+        if (title.codePointCount(0, title.length()) > MAX_TITLE) {
+            throw new UploadRejectedException("Titles are " + MAX_TITLE + " characters at most.");
+        }
+        return title;
+    }
+
+    public Optional<Gif> find(String id) {
+        if (id == null || id.length() != ID_LENGTH) {
+            return Optional.empty();
+        }
+        return gifs.findById(id);
+    }
+
+    public Page<Gif> feed(int page) {
+        return gifs.findAllByOrderByCreatedAtDesc(PageRequest.of(Math.max(page, 0), PAGE_SIZE));
+    }
+
+    /** {@code #tag} searches tags exactly; anything else searches titles, case-insensitively. */
+    public Page<Gif> search(String query, int page) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "createdAt"));
+        String q = query == null ? "" : query.strip();
+        if (q.startsWith("#")) {
+            String tag = Tags.normalize(q.substring(1));
+            return tag == null ? Page.empty(pageable) : gifs.findByTagsOrderByCreatedAtDesc(tag, pageable);
+        }
+        if (q.length() > MAX_TITLE) {
+            q = q.substring(0, MAX_TITLE);
+        }
+        return gifs.findByTitleMatching(Pattern.quote(q), pageable);
+    }
+
+    public List<Gif> all() {
+        return gifs.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    /** Removes the stored MP4, then the record. */
+    public void delete(Gif gif) throws IOException {
+        storage.delete(gif.storageKey());
+        gifs.delete(gif);
+        log.info("deleted gif {}", gif.getId());
+    }
+
+    /** Every GIF the account owns: the account reset. */
+    public int deleteAllOwnedBy(String ownerId) throws IOException {
+        List<Gif> owned = gifs.findByOwnerId(ownerId);
+        for (Gif gif : owned) {
+            delete(gif);
+        }
+        return owned.size();
+    }
+
+    static String newId() {
+        StringBuilder sb = new StringBuilder(ID_LENGTH);
+        for (int i = 0; i < ID_LENGTH; i++) {
+            sb.append(ID_ALPHABET.charAt(RANDOM.nextInt(ID_ALPHABET.length())));
+        }
+        return sb.toString();
+    }
+}

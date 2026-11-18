@@ -1,0 +1,29 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Upload a GIF', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <h1>Upload a GIF</h1>
+    <p>GIFs only, up to 20 MB. Anything longer than 7.77 seconds is trimmed to 7.77 seconds. Every GIF is public.</p>
+    <!-- app.js sends the file as the raw request body; the form's own submit is a no-JS fallback message. -->
+    <form id="upload-form" th:action="@{/upload}" method="post" class="stack" th:attr="data-max-bytes=${maxBytes}">
+        <label for="file">GIF file</label>
+        <input type="file" id="file" name="file" accept="image/gif" required>
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" required maxlength="120" autocomplete="off">
+        <label for="tags">Tags <span class="hint">(up to 10, like #senate #debate)</span></label>
+        <input type="text" id="tags" name="tags" maxlength="400" autocomplete="off">
+        <button type="submit" class="button">Upload</button>
+        <p class="notice bad" data-upload-error hidden role="alert"></p>
+        <p class="hint" data-upload-status hidden role="status">Uploading and converting…</p>
+    </form>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Sign in', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <h1>Sign in</h1>
+    <p class="notice" th:if="${param.ended}" role="status">That account was reset or removed, so you were signed out.</p>
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+    <p>No passwords here. Enter your email and we'll send you a link that signs you in.
+        New here? The same link creates your account.</p>
+    <form th:action="@{/signin}" method="post" class="stack">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" th:value="${email}" required autocomplete="email" maxlength="254" autofocus>
+        <button type="submit" class="button">Email me a sign-in link</button>
+    </form>
+    <p class="hint">The link works once, for 15 minutes, and only in this browser.</p>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

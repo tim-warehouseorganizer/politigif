@@ -1,0 +1,19 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head(${status == 404} ? 'Not found' : 'Something went wrong', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <h1 th:text="${status == 404} ? 'That GIF isn\'t here' : 'Something went wrong'">Something went wrong</h1>
+    <p th:if="${status == 404}">It may have been deleted, or the link is mistyped.</p>
+    <p th:unless="${status == 404}">Try again in a moment.</p>
+    <p><a class="button" href="/">Back to the newest GIFs</a></p>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head('Account', true)}"></th:block>
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap narrow">
+    <h1>Account</h1>
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+    <p>Signed in as <strong th:text="${email}">pat@example.com</strong>.</p>
+
+    <section>
+        <h2>Change your seedling</h2>
+        <p class="hint">Every account change needs your current seedling.</p>
+        <form th:action="@{/account/seedling}" method="post" class="stack">
+            <label for="current">Current seedling</label>
+            <input type="password" id="current" name="current" required autocomplete="current-password">
+            <label for="seedling">New seedling (8 characters or more)</label>
+            <input type="password" id="seedling" name="seedling" required minlength="8" autocomplete="new-password">
+            <label for="confirmation">New seedling again</label>
+            <input type="password" id="confirmation" name="confirmation" required minlength="8" autocomplete="new-password">
+            <button type="submit" class="button">Change seedling</button>
+        </form>
+    </section>
+
+    <section class="danger-zone">
+        <h2>Forgot your seedling? Reset your account</h2>
+        <p>A reset <strong>deletes every GIF you've uploaded</strong> and everything else on your account.
+            We then email a fresh sign-in link to the same address, and you choose a new seedling on the empty account.
+            It can't be undone.</p>
+        <form th:action="@{/account/reset}" method="post" class="stack">
+            <label class="check"><input type="checkbox" name="understood" value="true" required>
+                I understand this deletes all my GIFs.</label>
+            <button type="submit" class="button danger">Reset my account</button>
+        </form>
+    </section>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!--
+  Copyright (c) 2026 Kismet Software LLC. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/common :: site-head(${searching} ? 'Search' : 'Political GIFs to share', ${searching})}"></th:block>
+    <meta name="description" content="Political GIFs, newest first. Drop one, share it with friends.">
+    <link rel="canonical" th:if="${!searching}" th:href="${canonicalBaseUrl} + '/'">
+</head>
+<body>
+<header th:replace="~{fragments/common :: navbar}"></header>
+<main class="wrap">
+    <th:block th:replace="~{fragments/common :: flash}"></th:block>
+    <p class="notice" th:if="${param.welcome}" role="status">You're in. Your seedling is set: keep it somewhere safe, it can't be recovered.</p>
+
+    <h1 th:if="${searching}">Results for <span th:text="${q}">#senate</span></h1>
+    <h1 th:unless="${searching}">Newest GIFs</h1>
+
+    <p th:if="${gifs.isEmpty()}" class="empty" th:text="${searching} ? 'Nothing matches that yet.' : 'No GIFs yet. Be the first.'">No GIFs yet.</p>
+
+    <ul class="grid">
+        <li th:each="g : ${gifs.content}" class="card">
+            <a th:href="@{/g/{id}(id=${g.id})}">
+                <video th:src="@{/g/{id}.mp4(id=${g.id})}" autoplay muted loop playsinline preload="metadata"
+                       th:width="${g.width}" th:height="${g.height}"></video>
+                <span class="title" th:text="${g.title}">Title</span>
+            </a>
+            <div class="tags">
+                <a class="tag" th:each="t : ${g.tags}" th:href="@{/(q='#' + ${t})}" th:text="'#' + ${t}">#tag</a>
+            </div>
+        </li>
+    </ul>
+
+    <nav class="pager" th:if="${gifs.totalPages > 1}" aria-label="Pages">
+        <a th:if="${gifs.hasPrevious()}" th:href="@{/(q=${searching} ? ${q} : null, page=${gifs.number - 1})}">← Newer</a>
+        <a th:if="${gifs.hasNext()}" th:href="@{/(q=${searching} ? ${q} : null, page=${gifs.number + 1})}">Older →</a>
+    </nav>
+</main>
+<footer th:replace="~{fragments/common :: footer}"></footer>
+</body>
+</html>
