@@ -4,6 +4,7 @@
 
 package com.kismetsoftware.politigif.account;
 
+import com.kismetsoftware.politigif.gif.GifService;
 import com.kismetsoftware.politigif.ratelimit.RateLimitedException;
 import com.kismetsoftware.politigif.ratelimit.RateLimiter;
 import com.kismetsoftware.politigif.security.PolitigifPrincipal;
@@ -35,9 +36,11 @@ public class AccountController {
     private final AccountResetService resetService;
     private final SigninNonceCookie nonceCookie;
     private final SessionSignIn sessionSignIn;
+    private final GifService gifService;
 
     public AccountController(SeedlingService seedlingService, AccountResetService resetService,
-                             SigninNonceCookie nonceCookie, SessionSignIn sessionSignIn) {
+                             SigninNonceCookie nonceCookie, SessionSignIn sessionSignIn, GifService gifService) {
+        this.gifService = gifService;
         this.seedlingService = seedlingService;
         this.resetService = resetService;
         this.nonceCookie = nonceCookie;
@@ -47,6 +50,8 @@ public class AccountController {
     @GetMapping("/account")
     public String account(@AuthenticationPrincipal PolitigifPrincipal principal, Model model) {
         model.addAttribute("email", principal.email());
+        // The owner's own GIFs, hidden ones included, each with its Hide / Unhide toggle.
+        model.addAttribute("gifs", gifService.ownedBy(principal.userId()));
         return "account";
     }
 

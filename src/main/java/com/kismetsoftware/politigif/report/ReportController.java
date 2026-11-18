@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.io.IOException;
 
 /** The Report button on a share page, and the admin queue that answers it. */
 @Controller
@@ -63,10 +62,18 @@ public class ReportController {
         return "redirect:/admin/reports";
     }
 
-    @PostMapping("/admin/gifs/{gifId}/delete")
-    public String delete(@PathVariable String gifId, RedirectAttributes redirect) throws IOException {
-        reportService.deleteGif(gifId);
-        redirect.addFlashAttribute("notice", "GIF deleted.");
+    /** Admin hide: same effect as an owner hide, but the owner cannot undo it. GIFs are never deleted. */
+    @PostMapping("/admin/gifs/{gifId}/hide")
+    public String hide(@PathVariable String gifId, RedirectAttributes redirect) {
+        reportService.hideGif(gifId);
+        redirect.addFlashAttribute("notice", "GIF hidden. Its owner can't unhide it.");
         return "redirect:/admin/reports";
+    }
+
+    @PostMapping("/admin/gifs/{gifId}/unhide")
+    public String unhide(@PathVariable String gifId, RedirectAttributes redirect) {
+        reportService.unhideGif(gifId);
+        redirect.addFlashAttribute("notice", "Admin hide removed.");
+        return "redirect:/g/" + gifId;
     }
 }

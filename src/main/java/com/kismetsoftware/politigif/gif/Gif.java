@@ -38,6 +38,12 @@ public class Gif {
     private boolean trimmed;
     private long mp4Bytes;
 
+    /** The owner hid it; the owner can unhide it. */
+    private boolean hiddenByOwner;
+
+    /** An admin hid it; the owner cannot undo this. */
+    private boolean hiddenByAdmin;
+
     public Gif() {
     }
 
@@ -98,6 +104,35 @@ public class Gif {
 
     public boolean isTrimmed() {
         return trimmed;
+    }
+
+    public boolean isHiddenByOwner() {
+        return hiddenByOwner;
+    }
+
+    public void setHiddenByOwner(boolean hiddenByOwner) {
+        this.hiddenByOwner = hiddenByOwner;
+    }
+
+    public boolean isHiddenByAdmin() {
+        return hiddenByAdmin;
+    }
+
+    public void setHiddenByAdmin(boolean hiddenByAdmin) {
+        this.hiddenByAdmin = hiddenByAdmin;
+    }
+
+    /** Hidden from the public by anyone: out of the feed, search and sitemap; 404 to strangers. */
+    public boolean isHidden() {
+        return hiddenByOwner || hiddenByAdmin;
+    }
+
+    /**
+     * The visibility rule: a public GIF is visible to everyone; a hidden one only to its owner and
+     * to admins. {@code viewerId} is null for a signed-out visitor.
+     */
+    public boolean visibleTo(String viewerId, boolean viewerIsAdmin) {
+        return !isHidden() || viewerIsAdmin || (viewerId != null && viewerId.equals(ownerId));
     }
 
     public long getMp4Bytes() {

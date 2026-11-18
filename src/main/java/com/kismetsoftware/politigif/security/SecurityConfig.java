@@ -77,6 +77,8 @@ public class SecurityConfig {
         authHttp.requestMatchers(HttpMethod.GET, "/").permitAll();
         authHttp.requestMatchers(HttpMethod.GET, "/g/**").permitAll();
         authHttp.requestMatchers(HttpMethod.POST, "/g/*/report").permitAll();
+        // Hide / unhide: the owner, signed in (no seedling needed); the controller 404s anyone else.
+        authHttp.requestMatchers(HttpMethod.POST, "/g/*/hide", "/g/*/unhide").authenticated();
 
         // ---- signed in ----
         authHttp.requestMatchers("/upload").authenticated();

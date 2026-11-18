@@ -14,6 +14,24 @@
     <p>Signed in as <strong th:text="${email}">pat@example.com</strong>.</p>
 
     <section>
+        <h2>Your GIFs</h2>
+        <p class="hint" th:if="${gifs.isEmpty()}">You haven't uploaded any yet. <a href="/upload">Upload one</a>.</p>
+        <ul class="mine" th:unless="${gifs.isEmpty()}">
+            <li th:each="g : ${gifs}">
+                <a th:href="@{/g/{id}(id=${g.id})}" th:text="${g.title}">Title</a>
+                <span class="hint" th:if="${g.hiddenByAdmin}">Hidden by an admin</span>
+                <span class="hint" th:if="${g.hiddenByOwner and !g.hiddenByAdmin}">Hidden from public</span>
+                <form th:if="${!g.hiddenByOwner}" th:action="@{/g/{id}/hide(id=${g.id})}" method="post">
+                    <button type="submit" class="button small">Hide</button>
+                </form>
+                <form th:if="${g.hiddenByOwner}" th:action="@{/g/{id}/unhide(id=${g.id})}" method="post">
+                    <button type="submit" class="button small">Unhide</button>
+                </form>
+            </li>
+        </ul>
+    </section>
+
+    <section>
         <h2>Change your seedling</h2>
         <p class="hint">Every account change needs your current seedling.</p>
         <form th:action="@{/account/seedling}" method="post" class="stack">

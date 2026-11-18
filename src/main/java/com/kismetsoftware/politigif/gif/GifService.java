@@ -93,40 +93,86 @@ public class GifService {
         return gifs.findById(id);
     }
 
-    public Page<Gif> feed(int page) {
-        return gifs.findAllByOrderByCreatedAtDesc(PageRequest.of(Math.max(page, 0), PAGE_SIZE));
+    /**
+     * A GIF as this viewer may see it: hidden GIFs exist only for their owner and admins, and look
+     * exactly like a missing id to everyone else (no existence oracle).
+     */
+    public Optional<Gif> findVisible(String id, String viewerId, boolean viewerIsAdmin) {
+        return find(id).filter(g -> g.visibleTo(viewerId, viewerIsAdmin));
     }
 
-    /** {@code #tag} searches tags exactly; anything else searches titles, case-insensitively. */
+    /** Public GIFs only, newest first. */
+    public Page<Gif> feed(int page) {
+        return gifs.findPublic(newestFirst(page));
+    }
+
+    /** Public GIFs only. {@code #tag} searches tags exactly; anything else searches titles, case-insensitively. */
     public Page<Gif> search(String query, int page) {
-        Pageable pageable = PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = newestFirst(page);
         String q = query == null ? "" : query.strip();
         if (q.startsWith("#")) {
             String tag = Tags.normalize(q.substring(1));
-            return tag == null ? Page.empty(pageable) : gifs.findByTagsOrderByCreatedAtDesc(tag, pageable);
+            return tag == null ? Page.empty(pageable) : gifs.findPublicByTag(tag, pageable);
         }
         if (q.length() > MAX_TITLE) {
             q = q.substring(0, MAX_TITLE);
         }
-        return gifs.findByTitleMatching(Pattern.quote(q), pageable);
+        return gifs.findPublicByTitleMatching(Pattern.quote(q), pageable);
     }
 
-    public List<Gif> all() {
-        return gifs.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+    /** Every public GIF, for the sitemap. */
+    public List<Gif> allPublic() {
+        return gifs.findAllPublic(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
-    /** Removes the stored MP4, then the record. */
-    public void delete(Gif gif) throws IOException {
-        storage.delete(gif.storageKey());
-        gifs.delete(gif);
-        log.info("deleted gif {}", gif.getId());
+    /** The owner's own GIFs, hidden ones included. */
+    public List<Gif> ownedBy(String ownerId) {
+        return gifs.findByOwnerIdOrderByCreatedAtDesc(ownerId);
     }
 
-    /** Every GIF the account owns: the account reset. */
+    private static Pageable newestFirst(int page) {
+        return PageRequest.of(Math.max(page, 0), PAGE_SIZE, Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    // ---- hiding: GIFs are never deleted (except by the account reset, pending a decision) ----
+
+    /**
+     * The owner hides or unhides their own GIF. Needs only a signed-in session, not the seedling.
+     * Unhiding clears only the owner's flag: a GIF an admin hid stays hidden.
+     *
+     * @return the GIF, or empty if it doesn't exist or isn't theirs (the caller answers 404)
+     */
+    public Optional<Gif> setHiddenByOwner(String id, String ownerId, boolean hidden) {
+        Optional<Gif> gif = find(id).filter(g -> g.getOwnerId().equals(ownerId));
+        gif.ifPresent(g -> {
+            g.setHiddenByOwner(hidden);
+            gifs.save(g);
+            log.info("gif {} {} by its owner", g.getId(), hidden ? "hidden" : "unhidden");
+        });
+        return gif;
+    }
+
+    /** An admin hides or unhides a GIF. The admin flag is one the owner cannot clear. */
+    public Optional<Gif> setHiddenByAdmin(String id, boolean hidden) {
+        Optional<Gif> gif = find(id);
+        gif.ifPresent(g -> {
+            g.setHiddenByAdmin(hidden);
+            gifs.save(g);
+            log.info("gif {} {} by an admin", g.getId(), hidden ? "hidden" : "unhidden");
+        });
+        return gif;
+    }
+
+    /**
+     * Every GIF the account owns, record and stored MP4: the account reset. The ONLY path that
+     * removes a GIF; it is kept as-is pending the owner's decision on what a reset does to GIFs.
+     */
     public int deleteAllOwnedBy(String ownerId) throws IOException {
         List<Gif> owned = gifs.findByOwnerId(ownerId);
         for (Gif gif : owned) {
-            delete(gif);
+            storage.delete(gif.storageKey());
+            gifs.delete(gif);
+            log.info("deleted gif {} (account reset)", gif.getId());
         }
         return owned.size();
     }

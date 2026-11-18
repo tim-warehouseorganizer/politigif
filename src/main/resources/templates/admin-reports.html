@@ -22,8 +22,8 @@
                 <p><span th:text="${item.reports().size()}">2</span> report(s):
                     <span th:each="r, s : ${item.reports()}"><span th:text="${r.reason.label()}">Spam</span><span th:unless="${s.last}">, </span></span></p>
                 <div class="actions">
-                    <form th:action="@{/admin/gifs/{id}/delete(id=${item.gifId()})}" method="post">
-                        <button type="submit" class="button danger">Delete GIF</button>
+                    <form th:if="${item.gif() != null and !item.gif().hiddenByAdmin}" th:action="@{/admin/gifs/{id}/hide(id=${item.gifId()})}" method="post">
+                        <button type="submit" class="button danger">Hide GIF</button>
                     </form>
                     <form th:action="@{/admin/reports/{id}/dismiss(id=${item.gifId()})}" method="post">
                         <button type="submit" class="button">Dismiss reports</button>

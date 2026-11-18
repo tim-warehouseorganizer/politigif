@@ -28,6 +28,12 @@
 <main class="wrap narrow">
     <th:block th:replace="~{fragments/common :: flash}"></th:block>
     <p class="notice" th:if="${isOwner and gif.trimmed}" role="status">Your GIF was trimmed to 7.77 s</p>
+    <p class="notice warn" th:if="${gif.hidden and (isOwner or isAdmin)}" role="status">
+        <strong>Hidden from public.</strong>
+        <span th:if="${gif.hiddenByAdmin and !isAdmin}">An admin hid this GIF, so you can't unhide it.</span>
+        <span th:if="${gif.hiddenByAdmin and isAdmin}">Hidden by an admin<span th:if="${gif.hiddenByOwner}"> and by its owner</span>.</span>
+        <span th:if="${!gif.hiddenByAdmin}">Only you<span th:if="${isAdmin and !isOwner}">, its owner</span> and admins can see it; it's out of the feed, search and sitemap.</span>
+    </p>
 
     <h1 th:text="${gif.title}">Title</h1>
     <figure class="player">
@@ -58,8 +64,19 @@
         </form>
     </details>
 
-    <form sec:authorize="hasRole('ADMIN')" class="admin-delete" th:action="@{/admin/gifs/{id}/delete(id=${gif.id})}" method="post">
-        <button type="submit" class="button danger">Delete this GIF (admin)</button>
+    <!-- Owner: Hide / Unhide (signed-in session only, no seedling). GIFs are never deleted. -->
+    <form th:if="${isOwner and !gif.hiddenByOwner}" class="owner-toggle" th:action="@{/g/{id}/hide(id=${gif.id})}" method="post">
+        <button type="submit" class="button">Hide from public</button>
+    </form>
+    <form th:if="${isOwner and gif.hiddenByOwner}" class="owner-toggle" th:action="@{/g/{id}/unhide(id=${gif.id})}" method="post">
+        <button type="submit" class="button">Unhide</button>
+    </form>
+
+    <form sec:authorize="hasRole('ADMIN')" th:if="${!gif.hiddenByAdmin}" class="admin-delete" th:action="@{/admin/gifs/{id}/hide(id=${gif.id})}" method="post">
+        <button type="submit" class="button danger">Hide this GIF (admin)</button>
+    </form>
+    <form sec:authorize="hasRole('ADMIN')" th:if="${gif.hiddenByAdmin}" class="admin-delete" th:action="@{/admin/gifs/{id}/unhide(id=${gif.id})}" method="post">
+        <button type="submit" class="button">Remove admin hide</button>
     </form>
 </main>
 <footer th:replace="~{fragments/common :: footer}"></footer>

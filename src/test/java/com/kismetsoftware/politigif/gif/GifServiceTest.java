@@ -95,27 +95,27 @@ class GifServiceTest {
 
     @Test
     void aHashQuerySearchesTagsExactly() {
-        when(gifs.findByTagsOrderByCreatedAtDesc(eq("senate"), any(Pageable.class))).thenReturn(Page.empty());
+        when(gifs.findPublicByTag(eq("senate"), any(Pageable.class))).thenReturn(Page.empty());
 
         service.search("  #Senate ", 0);
 
-        verify(gifs).findByTagsOrderByCreatedAtDesc(eq("senate"), any(Pageable.class));
-        verify(gifs, never()).findByTitleMatching(anyString(), any());
+        verify(gifs).findPublicByTag(eq("senate"), any(Pageable.class));
+        verify(gifs, never()).findPublicByTitleMatching(anyString(), any());
     }
 
     @Test
     void aBareHashFindsNothingWithoutQuerying() {
         assertThat(service.search("#", 0).getContent()).isEmpty();
-        verify(gifs, never()).findByTagsOrderByCreatedAtDesc(anyString(), any());
+        verify(gifs, never()).findPublicByTag(anyString(), any());
     }
 
     @Test
     void otherQueriesSearchTitlesWithTheRegexQuoted() {
-        when(gifs.findByTitleMatching(anyString(), any(Pageable.class))).thenReturn(Page.empty());
+        when(gifs.findPublicByTitleMatching(anyString(), any(Pageable.class))).thenReturn(Page.empty());
 
         service.search("vote (again)", 0);
 
-        verify(gifs).findByTitleMatching(eq("\\Qvote (again)\\E"), any(Pageable.class));
+        verify(gifs).findPublicByTitleMatching(eq("\\Qvote (again)\\E"), any(Pageable.class));
     }
 
     @Test
@@ -123,16 +123,6 @@ class GifServiceTest {
         assertThat(service.find("short")).isEmpty();
         assertThat(service.find(null)).isEmpty();
         verify(gifs, never()).findById(anyString());
-    }
-
-    @Test
-    void deleteRemovesTheStoredFileThenTheRecord() throws IOException {
-        Gif gif = new Gif("abcdEFGH23", "t", List.of(), "u1", NOW, 2, 2, 10, false, 1);
-
-        service.delete(gif);
-
-        verify(storage).delete("gifs/abcdEFGH23.mp4");
-        verify(gifs).delete(gif);
     }
 
     @Test
@@ -148,12 +138,12 @@ class GifServiceTest {
 
     @Test
     void negativePagesAreTreatedAsTheFirst() {
-        when(gifs.findAllByOrderByCreatedAtDesc(any(Pageable.class))).thenReturn(Page.empty());
+        when(gifs.findPublic(any(Pageable.class))).thenReturn(Page.empty());
 
         service.feed(-3);
 
         ArgumentCaptor<Pageable> page = ArgumentCaptor.forClass(Pageable.class);
-        verify(gifs).findAllByOrderByCreatedAtDesc(page.capture());
+        verify(gifs).findPublic(page.capture());
         assertThat(page.getValue().getPageNumber()).isZero();
         assertThat(Optional.of(page.getValue().getPageSize())).contains(GifService.PAGE_SIZE);
     }

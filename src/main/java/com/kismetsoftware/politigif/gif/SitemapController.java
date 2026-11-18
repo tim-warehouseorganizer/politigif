@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * {@code /sitemap.xml}, generated: the home page plus one {@code <url>} per share page, on the
+ * {@code /sitemap.xml}, generated: the home page plus one {@code <url>} per PUBLIC share page (hidden GIFs never appear), on the
  * canonical host (the same property the share pages' canonical links use, so they never disagree).
  * One query, no caching: fine at this size.
  */
@@ -30,7 +30,7 @@ public class SitemapController {
 
     @GetMapping(value = "/sitemap.xml", produces = "application/xml")
     public String sitemap() {
-        return render(canonicalBase, gifService.all());
+        return render(canonicalBase, gifService.allPublic());
     }
 
     static String render(String base, List<Gif> gifs) {

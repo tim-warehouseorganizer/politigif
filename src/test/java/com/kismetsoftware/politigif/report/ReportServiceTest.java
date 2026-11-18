@@ -95,23 +95,20 @@ class ReportServiceTest {
     }
 
     @Test
-    void deletingTheGifClosesItsReports() throws IOException {
-        when(gifService.find("abcdEFGH23")).thenReturn(Optional.of(GIF));
+    void anAdminHideHidesTheGifAndClosesItsReports() throws IOException {
+        service.hideGif("abcdEFGH23");
 
-        service.deleteGif("abcdEFGH23");
-
-        verify(gifService).delete(GIF);
+        verify(gifService).setHiddenByAdmin("abcdEFGH23", true);
         verify(reports).deleteByGifId("abcdEFGH23");
+        verify(gifService, never()).deleteAllOwnedBy(any());
     }
 
     @Test
-    void deletingAnAlreadyGoneGifStillClosesItsReports() throws IOException {
-        when(gifService.find("gone000000")).thenReturn(Optional.empty());
+    void anAdminUnhideClearsOnlyTheAdminFlagAndLeavesReportsAlone() {
+        service.unhideGif("abcdEFGH23");
 
-        service.deleteGif("gone000000");
-
-        verify(gifService, never()).delete(any());
-        verify(reports).deleteByGifId("gone000000");
+        verify(gifService).setHiddenByAdmin("abcdEFGH23", false);
+        verify(reports, never()).deleteByGifId(any());
     }
 
     @Test

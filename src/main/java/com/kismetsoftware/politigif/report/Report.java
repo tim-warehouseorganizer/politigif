@@ -10,7 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/** Someone flagged a GIF. Open until an admin dismisses it or deletes the GIF. */
+/** Someone flagged a GIF. Open until an admin dismisses it or hides the GIF. */
 @Document("reports")
 public class Report {
 

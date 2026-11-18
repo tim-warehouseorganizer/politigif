@@ -10,13 +10,11 @@ import com.kismetsoftware.politigif.ratelimit.RateLimitPolicy;
 import com.kismetsoftware.politigif.ratelimit.RateLimiter;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /** Reports in, the admin queue out, and the two ways a report is closed. */
 @Service
@@ -68,12 +66,17 @@ public class ReportService {
         reports.deleteByGifId(gifId);
     }
 
-    /** The GIF goes (record and stored MP4), and its reports close. */
-    public void deleteGif(String gifId) throws IOException {
-        Optional<Gif> gif = gifService.find(gifId);
-        if (gif.isPresent()) {
-            gifService.delete(gif.get());
-        }
+    /**
+     * An admin hides the GIF (a flag its owner cannot undo) and its reports close. GIFs are never
+     * deleted: the record and the stored MP4 stay.
+     */
+    public void hideGif(String gifId) {
+        gifService.setHiddenByAdmin(gifId, true);
         reports.deleteByGifId(gifId);
+    }
+
+    /** An admin reverses their own hide. The owner's flag, if set, is left alone. */
+    public void unhideGif(String gifId) {
+        gifService.setHiddenByAdmin(gifId, false);
     }
 }
